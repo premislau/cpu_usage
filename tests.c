@@ -5,12 +5,70 @@ int main();
 void testExtractDataFromRaw();
 void testAnalyze();
 struct CpuReadData *getMockCpuReadData(int, unsigned long long);
+struct CpuUsage *getMockCpuUsage(int, double);
+void testReadDataMailbox();
+void testUsageMailbox();
 
 int main()
 {
-    testExtractDataFromRaw();
-    testAnalyze();
+    testReadDataMailbox();
+    testUsageMailbox();
+    // testExtractDataFromRaw();
+    // testAnalyze();
+    printf("All tests executed successfully.\n");
     return 0;
+}
+
+void testReadDataMailbox()
+{
+    enum SendingResult mr;
+    struct CpuReadData *received;
+    received = receiveReadData();
+    assert(NULL == received);
+
+    int maxLen = getMaxLen();
+    int cpuCount = 2;
+    for (int i = 0; i < maxLen; ++i)
+    {
+        mr = sendReadData(getMockCpuReadData(cpuCount, i));
+        assert(SUCCESS == mr);
+    }
+    mr = sendReadData(getMockCpuReadData(cpuCount, 0));
+    assert(FULL == mr);
+    for (int i = 0; i < maxLen; ++i) // i values should be the same as in previous loop
+    {
+        received = receiveReadData();
+        assert(i==received->guest);
+        free(received);
+    }
+    received = receiveReadData();
+    assert(NULL == received);
+}
+
+void testUsageMailbox()
+{
+    enum SendingResult mr;
+    struct CpuUsage *received;
+    received = receiveUsage();
+    assert(NULL == received);
+
+    int maxLen = getMaxLen();
+    int cpuCount = 2;
+    for (int i = 0; i < maxLen; ++i)
+    {
+        mr = sendUsage(getMockCpuUsage(cpuCount, (double) i));
+        assert(SUCCESS == mr);
+    }
+    mr = sendUsage(getMockCpuUsage(cpuCount, (double) 0));
+    assert(FULL == mr);
+    for (int i = 0; i < maxLen; ++i) // i values should be the same as in previous loop
+    {
+        received = receiveUsage();
+        assert((double)i==received->usage);
+        free(received);
+    }
+    received = receiveUsage();
+    assert(NULL == received);
 }
 
 void testAnalyze()
@@ -25,9 +83,9 @@ void testAnalyze()
         usage = analyze(readData, prevTimeData, cpuCount);
         for (int i = 0; i < cpuCount; ++i)
         {
-            unsigned long long expectedIdlde = 2*j;
-            unsigned long long expectedNonIdlde = 6*j;
-            unsigned long long expectedTotal = 8*j;
+            unsigned long long expectedIdlde = 2 * j;
+            unsigned long long expectedNonIdlde = 6 * j;
+            unsigned long long expectedTotal = 8 * j;
             assert(expectedIdlde == (prevTimeData + i)->Idle);
             assert(expectedNonIdlde == (prevTimeData + i)->NonIdle);
             assert(expectedTotal == (prevTimeData + i)->Total);
@@ -40,7 +98,6 @@ void testAnalyze()
     }
 }
 
-// private function for testAnalyze()
 struct CpuReadData *getMockCpuReadData(int cpuCount, unsigned long long fillValue)
 {
     struct CpuReadData *ret = (struct CpuReadData *)malloc(cpuCount * sizeof(struct CpuReadData));
@@ -56,6 +113,22 @@ struct CpuReadData *getMockCpuReadData(int cpuCount, unsigned long long fillValu
         (ret + i)->steal = fillValue;
         (ret + i)->guest = fillValue;
         (ret + i)->guestnice = fillValue;
+        char *cpu_id = malloc(9 * sizeof(char));
+        sprintf(cpu_id, "cpu%d", i);
+        (ret+i)->cpu_id = cpu_id;
+    }
+    return ret;
+}
+
+struct CpuUsage *getMockCpuUsage(int cpuCount, double usage)
+{
+    struct CpuUsage *ret = (struct CpuUsage *)malloc(cpuCount * sizeof(struct CpuUsage));
+    for (int i = 0; i < cpuCount; ++i)
+    {
+        (ret+i)->usage=usage;
+        char *cpu_id = malloc(9 * sizeof(char));
+        sprintf(cpu_id, "cpu%d", i);
+        (ret+i)->cpu_id = cpu_id;
     }
     return ret;
 }

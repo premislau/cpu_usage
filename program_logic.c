@@ -1,40 +1,45 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include "program_logic.h"
 
-struct CpuReadData
+struct CpuReadData** analyzerMailbox;
+struct CpuUsage** printerMailbox;
+
+
+
+void readerLoop()
 {
-    unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guestnice;
-    char *cpu_id;
-};
+    int cpuCount = 0;
+    struct CpuReadData *readData;
+    while (1)
+    {
+        readData = readProcStat(&cpuCount);
+        //send data to analyzer
+    }
+}
 
-struct CpuTimeData
+void analyzerLoop(int cpuCount/*TODO: improve*/)
 {
-    unsigned long long Idle;
-    unsigned long long NonIdle;
-    unsigned long long Total;
-    char *cpu_id;
-};
+    // Maybe: extract cpuCount from read data
+    struct CpuTimeData *prevTimeData = startingTimeData(cpuCount);
+    while (1)
+    {
+        //receive data
+        //analyze data
+        //send analyzed data to printer
+    }
+}
 
-struct CpuUsage
+void printerLoop()
 {
-    char *cpu_id;
-    double usage;
-};
-
-
-struct CpuReadData *readProcStat(int *);
-struct CpuUsage *analyze(struct CpuReadData *, struct CpuTimeData *, int);
-void print(struct CpuUsage *, int);
-int extraxtCpuCount(char *);
-char *readRawData();
-struct CpuReadData *extractDataFromRaw(char*, int);
-struct CpuTimeData *startingTimeData(int);
+    while (1)
+    {
+        //receive data
+        //print data
+    }
+}
 
 struct CpuReadData *readProcStat(int *cpuCount)
 {
     char *rawData = readRawData();
-    //printf("%s\n",rawData);
     if (0 == *cpuCount)
     { // cpuCount is set to non-zero value only once
         *cpuCount = extraxtCpuCount(rawData);
@@ -44,7 +49,8 @@ struct CpuReadData *readProcStat(int *cpuCount)
     return ret;
 }
 
-struct CpuReadData *extractDataFromRaw(char* rawData, int cpuCount){
+struct CpuReadData *extractDataFromRaw(char *rawData, int cpuCount)
+{
     struct CpuReadData *ret = (struct CpuReadData *)malloc(cpuCount * sizeof(struct CpuReadData));
     int offset = 0;
     int cpuIndex = 0;
@@ -81,7 +87,6 @@ struct CpuUsage *analyze(struct CpuReadData *readData, struct CpuTimeData *previ
         unsigned long long NonIdle = (readData + cpu_index)->user + (readData + cpu_index)->nice + (readData + cpu_index)->system +
                                      (readData + cpu_index)->irq + (readData + cpu_index)->softirq + (readData + cpu_index)->steal;
         unsigned long long Total = Idle + NonIdle;
-        //printf("NonIdle: %llu, Idle: %llu Total: %llu\n", NonIdle, Idle, Total);
 
         double dNonIdle = (double)NonIdle - (double)(previousTimeData + cpu_index)->NonIdle;
         double dTotal = (double)Total - (double)(previousTimeData + cpu_index)->Total;
@@ -129,7 +134,7 @@ int extraxtCpuCount(char *rawData)
     int offset = 0;
     while (1)
     {
-        while ('\n' != *(rawData + offset++))
+        while ('\n' != *(rawData + offset++))// first "cpu" occurence is omitted
             ;
         ++ret;
         if ('c' != *(rawData + offset) || 'p' != *(rawData + offset) || 'u' != *(rawData + offset))
