@@ -147,8 +147,8 @@ struct ReadDataMailbox *createReadDataMailbox(int maxLen)
     {
         printf("Error during creation of mutex.\n");
     }
-    ret->lock;
     ret->data = malloc(maxLen * sizeof(struct CpuReadData));
+    return ret;
 }
 
 struct UsageMailbox *createUsageMailbox(int maxLen)
@@ -163,6 +163,7 @@ struct UsageMailbox *createUsageMailbox(int maxLen)
         printf("Error during creation of mutex.\n");
     }
     ret->data = malloc(maxLen * sizeof(struct CpuUsage));
+    return ret;
 }
 
 struct LogMailbox *createLogMailbox(int maxLen)
@@ -177,4 +178,5 @@ struct LogMailbox *createLogMailbox(int maxLen)
         printf("Error during creation of mutex.\n");
     }
     ret->data = malloc(maxLen * sizeof(char *));
+    return ret;
 }

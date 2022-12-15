@@ -1,8 +1,8 @@
 #include "program_logic.h"
 const useconds_t waitingTime = 1000;
-const useconds_t nextIterationWaitingTime = 100000;
+const useconds_t nextIterationWaitingTime = 500000;
 
-void *loggerLoop(void *arg)
+void *loggerLoop()
 {
     char *log;
     while (1)
@@ -13,10 +13,11 @@ void *loggerLoop(void *arg)
             usleep(waitingTime);
             log = receiveLog();
         }
+
     }
 }
 
-void *readerLoop(void *arg)
+void *readerLoop()
 {
     enum SendingResult sr;
     while (1)
@@ -32,7 +33,7 @@ void *readerLoop(void *arg)
     }
 }
 
-void *analyzerLoop(void *arg)
+void *analyzerLoop()
 {
     struct CpuReadData *readData;
     struct CpuUsage *usage;
@@ -74,9 +75,8 @@ void *analyzerLoop(void *arg)
     }
 }
 
-void *printerLoop(void *arg)
+void *printerLoop()
 {
-    int i = 0;
     struct CpuUsage *usage;
     while (1)
     {
@@ -117,7 +117,7 @@ struct CpuReadData *extractDataFromRaw(char *rawData, int cpuCount)
         char *temp = malloc(256 * sizeof(char));
         strcat(temp, cpu_id);
         strcat(temp, " %16llu %16llu %16llu %16llu %16llu %16llu %16llu %16llu %16llu %16llu");
-        int sscanfResult = sscanf(&*(rawData + offset), temp,
+        sscanf(&*(rawData + offset), temp,
                                   &(ret + cpuIndex)->user, &(ret + cpuIndex)->nice, &(ret + cpuIndex)->system, &(ret + cpuIndex)->idle,
                                   &(ret + cpuIndex)->iowait, &(ret + cpuIndex)->irq, &(ret + cpuIndex)->softirq, &(ret + cpuIndex)->steal,
                                   &(ret + cpuIndex)->guest, &(ret + cpuIndex)->guestnice);
@@ -132,8 +132,6 @@ struct CpuReadData *extractDataFromRaw(char *rawData, int cpuCount)
 struct CpuUsage *analyze(struct CpuReadData *readData, struct CpuTimeData *previousTimeData, int cpuCount)
 {
     struct CpuUsage *ret = (struct CpuUsage *)malloc(cpuCount * sizeof(struct CpuUsage));
-    struct CpuTimeData *newTimeData;
-    int offset = 0;
     int cpu_index = 0;
     while (cpu_index < cpuCount)
     {

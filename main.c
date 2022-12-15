@@ -7,8 +7,8 @@ int singleThreaded();
 
 int main()
 {
-    return multiThreaded();
-    //return singleThreaded();
+    //return multiThreaded();
+    return singleThreaded();
 }
 
 int multiThreaded(){
@@ -47,8 +47,7 @@ int singleThreaded(){
     struct CpuUsage *usage = analyze(readData, prevTimeData, cpuCount);
     print(usage, cpuCount);
     usleep(sleepTime);
-    for (int i = 0; i < 10; ++i)
-    {
+    while(1){
         free(readData);
         readData = readProcStat(&cpuCount);
         free(usage);
