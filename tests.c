@@ -13,20 +13,20 @@ int main()
 {
     testReadDataMailbox();
     testUsageMailbox();
-    // testExtractDataFromRaw();
-    // testAnalyze();
+    testExtractDataFromRaw();
+    testAnalyze();
     printf("All tests executed successfully.\n");
     return 0;
 }
 
 void testReadDataMailbox()
 {
+    initReadDataMailbox(2);
     enum SendingResult mr;
     struct CpuReadData *received;
     received = receiveReadData();
     assert(NULL == received);
 
-    int maxLen = getMaxLen();
     int cpuCount = 2;
     for (int i = 0; i < maxLen; ++i)
     {
@@ -47,12 +47,12 @@ void testReadDataMailbox()
 
 void testUsageMailbox()
 {
+    initUsageMailbox(2);
     enum SendingResult mr;
     struct CpuUsage *received;
     received = receiveUsage();
     assert(NULL == received);
 
-    int maxLen = getMaxLen();
     int cpuCount = 2;
     for (int i = 0; i < maxLen; ++i)
     {

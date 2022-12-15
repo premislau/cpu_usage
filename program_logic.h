@@ -1,13 +1,9 @@
 #include "messege_controller.c"
 
-
-
-
-
-
-void readerLoop();
-void analyzerLoop(int);
-void printerLoop();
+void *readerLoop(void* arg);
+void *analyzerLoop(void* arg);
+void *printerLoop(void* arg);
+void *loggerLoop(void *arg);
 
 struct CpuReadData *readProcStat(int *);
 struct CpuUsage *analyze(struct CpuReadData *, struct CpuTimeData *, int);

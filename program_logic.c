@@ -1,39 +1,93 @@
 #include "program_logic.h"
+const useconds_t waitingTime = 1000;
+const useconds_t nextIterationWaitingTime = 100000;
 
-struct CpuReadData** analyzerMailbox;
-struct CpuUsage** printerMailbox;
-
-
-
-void readerLoop()
+void *loggerLoop(void *arg)
 {
-    int cpuCount = 0;
+    char *log;
+    while (1)
+    {
+        log = receiveLog();
+        while (NULL == log)
+        {
+            usleep(waitingTime);
+            log = receiveLog();
+        }
+    }
+}
+
+void *readerLoop(void *arg)
+{
+    enum SendingResult sr;
+    while (1)
+    {
+        struct CpuReadData *readData = readProcStat(&cpuCount);
+        sr = sendReadData(readData);
+        while (FULL == sr)
+        {
+            usleep(waitingTime);
+            sr = sendReadData(readData);
+        }
+        usleep(nextIterationWaitingTime);
+    }
+}
+
+void *analyzerLoop(void *arg)
+{
     struct CpuReadData *readData;
+    struct CpuUsage *usage;
+    struct CpuTimeData *prevTimeData;
+    enum SendingResult sr;
+    readData = receiveReadData();
+    while (NULL == readData)
+    {
+        usleep(waitingTime);
+        readData = receiveReadData();
+    }
+    prevTimeData = startingTimeData(cpuCount);
+    usage = analyze(readData, prevTimeData, cpuCount);
+    sr = sendUsage(usage);
+    while (FULL == sr)
+    {
+        usleep(waitingTime);
+        sr = sendUsage(usage);
+    }
+    free(readData);
+    usleep(nextIterationWaitingTime);
     while (1)
     {
-        readData = readProcStat(&cpuCount);
-        //send data to analyzer
+        readData = receiveReadData();
+        while (NULL == readData)
+        {
+            usleep(waitingTime);
+            readData = receiveReadData();
+        }
+        usage = analyze(readData, prevTimeData, cpuCount);
+        sr = sendUsage(usage);
+        while (FULL == sr)
+        {
+            usleep(waitingTime);
+            sr = sendUsage(usage);
+        }
+        free(readData);
+        usleep(nextIterationWaitingTime);
     }
 }
 
-void analyzerLoop(int cpuCount/*TODO: improve*/)
+void *printerLoop(void *arg)
 {
-    // Maybe: extract cpuCount from read data
-    struct CpuTimeData *prevTimeData = startingTimeData(cpuCount);
+    int i = 0;
+    struct CpuUsage *usage;
     while (1)
     {
-        //receive data
-        //analyze data
-        //send analyzed data to printer
-    }
-}
-
-void printerLoop()
-{
-    while (1)
-    {
-        //receive data
-        //print data
+        usage = receiveUsage();
+        while (NULL == usage)
+        {
+            usleep(waitingTime);
+            usage = receiveUsage();
+        }
+        print(usage, cpuCount);
+        usleep(nextIterationWaitingTime);
     }
 }
 
@@ -134,7 +188,7 @@ int extraxtCpuCount(char *rawData)
     int offset = 0;
     while (1)
     {
-        while ('\n' != *(rawData + offset++))// first "cpu" occurence is omitted
+        while ('\n' != *(rawData + offset++)) // first "cpu" occurence is omitted
             ;
         ++ret;
         if ('c' != *(rawData + offset) || 'p' != *(rawData + offset) || 'u' != *(rawData + offset))
