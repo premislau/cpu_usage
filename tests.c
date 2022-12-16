@@ -38,7 +38,7 @@ void testReadDataMailbox()
     for (int i = 0; i < maxLen; ++i) // i values should be the same as in previous loop
     {
         received = receiveReadData();
-        assert(i==received->guest);
+        assert((unsigned long long) i==received->guest);
         free(received);
     }
     received = receiveReadData();
@@ -113,9 +113,7 @@ struct CpuReadData *getMockCpuReadData(int cpuCount, unsigned long long fillValu
         (ret + i)->steal = fillValue;
         (ret + i)->guest = fillValue;
         (ret + i)->guestnice = fillValue;
-        char *cpu_id = malloc(9 * sizeof(char));
-        sprintf(cpu_id, "cpu%d", i);
-        (ret+i)->cpu_id = cpu_id;
+        (ret+i)->index = i;
     }
     return ret;
 }
@@ -126,9 +124,7 @@ struct CpuUsage *getMockCpuUsage(int cpuCount, double usage)
     for (int i = 0; i < cpuCount; ++i)
     {
         (ret+i)->usage=usage;
-        char *cpu_id = malloc(9 * sizeof(char));
-        sprintf(cpu_id, "cpu%d", i);
-        (ret+i)->cpu_id = cpu_id;
+        (ret+i)->index = i;
     }
     return ret;
 }

@@ -1,7 +1,7 @@
 struct CpuReadData
 {
     unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guestnice;
-    char *cpu_id;
+    int index;
 };
 
 struct CpuTimeData
@@ -9,11 +9,11 @@ struct CpuTimeData
     unsigned long long Idle;
     unsigned long long NonIdle;
     unsigned long long Total;
-    char *cpu_id;
+    int index;
 };
 
 struct CpuUsage
 {
-    char *cpu_id;
     double usage;
+    int index;
 };

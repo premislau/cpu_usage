@@ -12,3 +12,7 @@ int extraxtCpuCount(char *);
 char *readRawData();
 struct CpuReadData *extractDataFromRaw(char *, int);
 struct CpuTimeData *startingTimeData(int);
+
+void initCpuNameStore(int);
+char *getCpuName(int);
+int getNumberOfDigits(int);
