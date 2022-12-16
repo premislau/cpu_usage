@@ -1,8 +1,8 @@
 cc ?= gcc
 
 
-compile: main.c tests.c
+compile: main.c
 	$(cc) -Wall -Wextra -pthread -o main.out main.c
 
 test: tests.c
-	$(cc) -o tests.out tests.c
+	$(cc) -Wall -Wextra -o tests.out tests.c
