@@ -11,6 +11,7 @@ void testUsageMailbox();
 
 int main()
 {
+    
     testReadDataMailbox();
     testUsageMailbox();
     testExtractDataFromRaw();
@@ -21,7 +22,8 @@ int main()
 
 void testReadDataMailbox()
 {
-    initReadDataMailbox(2);
+    int maxLen = 2;
+    initReadDataMailbox(maxLen);
     enum SendingResult mr;
     struct CpuReadData *received;
     received = receiveReadData();
@@ -47,7 +49,8 @@ void testReadDataMailbox()
 
 void testUsageMailbox()
 {
-    initUsageMailbox(2);
+    int maxLen = 2;
+    initUsageMailbox(maxLen);
     enum SendingResult mr;
     struct CpuUsage *received;
     received = receiveUsage();

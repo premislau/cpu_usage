@@ -1,21 +1,57 @@
 #include "program_logic.h"
 
-const useconds_t waitingTime = 50000;
+const useconds_t dataWaitingTime = 50000;
 const useconds_t nextIterationWaitingTime = 950000;
+const useconds_t watchdogNextIterationWaitingTime = 2000000;
+const useconds_t loggerNextIterationWaitingTime = 500000;
 char **cpuNameStore = NULL;
 
-void *loggerLoop()
+void *loggerLoop(void *args)
 {
-    char *log;
+    char *loggerFile = (char *)args;
+    struct Log received;
     while (1)
     {
-        log = receiveLog();
-        while (NULL == log)
+        received = receiveLog();
+        while (NONE_LOG != received.logType)
         {
-            usleep(waitingTime);
-            log = receiveLog();
+            saveLog(loggerFile, received);
+            received = receiveLog();
         }
+        usleep(loggerNextIterationWaitingTime);
     }
+}
+
+void saveLog(char *loggerFile, struct Log log)
+{
+    FILE *file = fopen(loggerFile, "a");
+    if (NULL == file)
+    {
+        printf("file cannot be opened\n");
+    }
+    char* strLog = logToString(log);
+    time_t now = time(0);
+    fprintf(file, "%s; %s", strLog, asctime(gmtime(&now)));
+    fclose(file);
+}
+
+char *logToString(struct Log log)
+{
+    char* ret = malloc(40*sizeof(char));
+    switch (log.logType)
+    {
+    case PROGRAM_STARTED:
+        sprintf(ret, "Program has been started");
+        
+        break;
+    case TERMINATION_BY_WATCHDOG:
+        sprintf(ret, "Program is terminated by watchdog");
+        break;
+    default:
+        sprintf(ret, "Unknown log");
+        break;
+    }
+    return ret;
 }
 
 void *readerLoop()
@@ -27,8 +63,17 @@ void *readerLoop()
         sr = sendReadData(readData);
         while (FULL == sr)
         {
-            usleep(waitingTime);
+            usleep(dataWaitingTime);
             sr = sendReadData(readData);
+        }
+        sr = sendActiveness(READER);
+        if (1 == watchdogActive)
+        {
+            while (SUCCESS != sr)
+            {
+                usleep(dataWaitingTime);
+                sr = sendActiveness(READER);
+            }
         }
         usleep(nextIterationWaitingTime);
     }
@@ -43,7 +88,7 @@ void *analyzerLoop()
     readData = receiveReadData();
     while (NULL == readData)
     {
-        usleep(waitingTime);
+        usleep(dataWaitingTime);
         readData = receiveReadData();
     }
     prevTimeData = startingTimeData(cpuCount);
@@ -52,7 +97,7 @@ void *analyzerLoop()
     sr = sendUsage(usage);
     while (FULL == sr)
     {
-        usleep(waitingTime);
+        usleep(dataWaitingTime);
         sr = sendUsage(usage);
     }
     usleep(nextIterationWaitingTime);
@@ -61,7 +106,7 @@ void *analyzerLoop()
         readData = receiveReadData();
         while (NULL == readData)
         {
-            usleep(waitingTime);
+            usleep(dataWaitingTime);
             readData = receiveReadData();
         }
         usage = analyze(readData, prevTimeData, cpuCount);
@@ -69,8 +114,18 @@ void *analyzerLoop()
         sr = sendUsage(usage);
         while (FULL == sr)
         {
-            usleep(waitingTime);
+            usleep(dataWaitingTime);
             sr = sendUsage(usage);
+        }
+
+        sr = sendActiveness(ANALYZER);
+        if (1 == watchdogActive)
+        {
+            while (SUCCESS != sr)
+            {
+                usleep(dataWaitingTime);
+                sr = sendActiveness(ANALYZER);
+            }
         }
         usleep(nextIterationWaitingTime);
     }
@@ -78,18 +133,76 @@ void *analyzerLoop()
 
 void *printerLoop()
 {
+    enum SendingResult sr;
     struct CpuUsage *usage;
     while (1)
     {
         usage = receiveUsage();
         while (NULL == usage)
         {
-            usleep(waitingTime);
+            usleep(dataWaitingTime);
             usage = receiveUsage();
         }
         print(usage, cpuCount);
         free(usage);
+        if (1 == watchdogActive)
+        {
+            sr = sendActiveness(PRINTER);
+            while (SUCCESS != sr)
+            {
+                usleep(dataWaitingTime);
+                sr = sendActiveness(PRINTER);
+            }
+        }
         usleep(nextIterationWaitingTime);
+    }
+}
+
+void *watchdogLoop(void *args)
+{
+    struct Log log;
+    log.logType = PROGRAM_STARTED;
+    sendLog(log);
+    struct WatchdogArgs *data = (struct WatchdogArgs *)args;
+    int *activeness = malloc(data->numberOfThreads * sizeof(int)); // bolean activeness of corresponding thread
+    for (int i = 0; i < data->numberOfThreads; ++i)
+    {
+        *(activeness + i) = 0;
+    }
+    enum ThreadType received;
+    usleep(watchdogNextIterationWaitingTime);
+    while (1)
+    {
+        while ((received = receiveActiveness()) != NONE_THREAD)
+        {
+            for (int i = 0; i < data->numberOfThreads; ++i)
+            {
+                if (received == ((data->threads + i)->threadType))
+                {
+                    *(activeness + i) = 1;
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < data->numberOfThreads; ++i)
+        {
+            if (0 == *(activeness + i))
+            {
+                printf("One of the threads is not active!\n");
+                printf("Program will be terminated!\n");
+                for (int i = 0; i < data->numberOfThreads; ++i)
+                {
+                    pthread_cancel((data->threads + i)->threadId);
+                }
+                void *retval = NULL;
+                pthread_exit(retval);
+            }
+        }
+        for (int i = 0; i < data->numberOfThreads; ++i)
+        {
+            *(activeness + i) = 0;
+        }
+        usleep(watchdogNextIterationWaitingTime);
     }
 }
 
@@ -98,11 +211,7 @@ struct CpuReadData *readProcStat(int *cpuCount)
     char *rawData = readRawData();
     if (0 == *cpuCount)
     { // cpuCount is set to non-zero value only once
-        *cpuCount = extraxtCpuCount(rawData);
-    }
-    if (NULL == cpuNameStore)
-    {
-        initCpuNameStore(*cpuCount);
+        *cpuCount = extractCpuCount(rawData);
     }
     struct CpuReadData *ret = extractDataFromRaw(rawData, *cpuCount);
     free(rawData);
@@ -111,6 +220,10 @@ struct CpuReadData *readProcStat(int *cpuCount)
 
 struct CpuReadData *extractDataFromRaw(char *rawData, int cpuCount)
 {
+    if (NULL == cpuNameStore)
+    {
+        initCpuNameStore(cpuCount);
+    }
     struct CpuReadData *ret = (struct CpuReadData *)malloc(cpuCount * sizeof(struct CpuReadData));
     int offset = 0;
     for (int i = 0; i < cpuCount; ++i)
@@ -121,7 +234,7 @@ struct CpuReadData *extractDataFromRaw(char *rawData, int cpuCount)
         char *temp = malloc(256 * sizeof(char));
         strcat(temp, cpuName);
         strcat(temp, " %16llu %16llu %16llu %16llu %16llu %16llu %16llu %16llu %16llu %16llu");
-        sscanf(&*(rawData + offset), temp,
+        sscanf(rawData + offset, temp,
                &(ret + i)->user, &(ret + i)->nice, &(ret + i)->system, &(ret + i)->idle,
                &(ret + i)->iowait, &(ret + i)->irq, &(ret + i)->softirq, &(ret + i)->steal,
                &(ret + i)->guest, &(ret + i)->guestnice);
@@ -157,9 +270,9 @@ struct CpuUsage *analyze(struct CpuReadData *readData, struct CpuTimeData *previ
 
 void print(struct CpuUsage *data, int cpuCount)
 {
-    for(int i = 0; i < cpuCount; ++i)
+    for (int i = 0; i < cpuCount; ++i)
     {
-        char* cpuName = getCpuName((data+i)->index);
+        char *cpuName = getCpuName((data + i)->index);
         printf("%s: %f%%, ", cpuName, (data + i)->usage);
     }
     printf("\n");
@@ -172,14 +285,14 @@ char *readRawData()
     {
         printf("file cannot be opened\n");
     }
-    int max_len = 0x10000;
-    char *rawData = malloc(max_len * sizeof(char));
-    fread(rawData, sizeof(char), max_len, file);
+    int maxLen = 0x10000;
+    char *rawData = malloc(maxLen * sizeof(char));
+    fread(rawData, sizeof(char), maxLen, file);
     fclose(file);
     return rawData;
 }
 
-int extraxtCpuCount(char *rawData)
+int extractCpuCount(char *rawData)
 {
     int ret = 0;
     int offset = 0;
@@ -217,7 +330,7 @@ void initCpuNameStore(int cpuCount)
     for (int i = 0; i < cpuCount; ++i)
     {
         char *name = malloc(nameChars * sizeof(char));
-        sprintf(name, "cpu%d", i);// matches naming in /proc/stat in the year 2022
+        sprintf(name, "cpu%d", i); // matches naming in /proc/stat in the year 2022
         *(cpuNameStore + i) = name;
     }
 }

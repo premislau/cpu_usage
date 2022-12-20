@@ -1,10 +1,10 @@
 #include "messege_controller.h"
 
-static struct ReadDataMailbox *readDataMailbox; // TODO: critical section
+static struct ReadDataMailbox *readDataMailbox;
 static struct UsageMailbox *usageMailbox;
+static struct ActivenessMailbox *activenessMailbox;
 static struct LogMailbox *logMailbox;
 int cpuCount = 0; // cpuCount is initialised to non-zero value by reader
-const int maxLen = 2;
 useconds_t lockWaitingTime = 10;
 
 enum SendingResult sendReadData(struct CpuReadData *readData)
@@ -45,7 +45,25 @@ enum SendingResult sendUsage(struct CpuUsage *usage)
     return SUCCESS;
 }
 
-enum SendingResult sendLog(char *log)
+enum SendingResult sendActiveness(enum ThreadType activeness){
+    while (0 != pthread_mutex_lock(&(activenessMailbox->lock))) // 0 means success
+    {
+        usleep(lockWaitingTime);
+    }
+    if (activenessMailbox->currentLen >= activenessMailbox->maxLen)
+    {
+        pthread_mutex_unlock(&(activenessMailbox->lock));
+        return FULL;
+    }
+    *(activenessMailbox->data + activenessMailbox->writeOffset) = activeness;
+
+    activenessMailbox->writeOffset = (activenessMailbox->writeOffset + 1) % activenessMailbox->maxLen;
+    ++activenessMailbox->currentLen;
+    pthread_mutex_unlock(&(activenessMailbox->lock));
+    return SUCCESS;
+}
+
+enum SendingResult sendLog(struct Log log)
 {
     while (0 != pthread_mutex_lock(&(logMailbox->lock))) // 0 means success
     {
@@ -85,7 +103,7 @@ struct CpuReadData *receiveReadData()
 
 struct CpuUsage *receiveUsage()
 {
-    while (0 != pthread_mutex_lock(&(usageMailbox->lock))) // 0 means usccess
+    while (0 != pthread_mutex_lock(&(usageMailbox->lock))) // 0 means success
     {
         usleep(lockWaitingTime);
     }
@@ -102,19 +120,41 @@ struct CpuUsage *receiveUsage()
     return ret;
 }
 
-char* receiveLog()
+enum ThreadType receiveActiveness()
 {
+    while (0 != pthread_mutex_lock(&(activenessMailbox->lock))) // 0 means success
+    {
+        usleep(lockWaitingTime);
+    }
+    if (activenessMailbox->currentLen <= 0)
+    {
+        pthread_mutex_unlock(&(activenessMailbox->lock));
+        return NONE_THREAD;
+    }
+    //receiver gets enum value, there is no need for repetitive memory freeing
+    enum ThreadType ret = *(activenessMailbox->data + activenessMailbox->readOffset);
+    activenessMailbox->readOffset = (activenessMailbox->readOffset + 1) % activenessMailbox->maxLen;
+    --activenessMailbox->currentLen;
+    pthread_mutex_unlock(&(activenessMailbox->lock));
+    return ret;
+}
+
+struct Log receiveLog()
+{
+    struct Log ret;
     while (0 != pthread_mutex_lock(&(logMailbox->lock))) // 0 means usccess
     {
         usleep(lockWaitingTime);
     }
     if (logMailbox->currentLen <= 0)
     {
-        pthread_mutex_unlock(&(usageMailbox->lock));
-        return NULL;
+        pthread_mutex_unlock(&(logMailbox->lock));
+        ret.logType=NONE_LOG;
+        ret.detail=0;
+        return ret;
     }
-    // receiver gets a pointer to data; the pointer in mailbox can be overwritten; freeing memory is receiver's resposiblity
-    char* ret = *(logMailbox->data + logMailbox->readOffset);
+    // receiver gets a struct, there is no need for memory freeing
+    ret = *(logMailbox->data + logMailbox->readOffset);
     logMailbox->readOffset = (logMailbox->readOffset + 1) % logMailbox->maxLen;
     --logMailbox->currentLen;
     pthread_mutex_unlock(&(logMailbox->lock));
@@ -129,6 +169,11 @@ void initReadDataMailbox(int maxLen)
 void initUsageMailbox(int maxLen)
 {
     usageMailbox = createUsageMailbox(maxLen);
+}
+
+void initActivenessMailbox(int maxLen)
+{
+    activenessMailbox = createActivenessMailbox(maxLen);
 }
 
 void initLogMailbox(int maxLen)
@@ -166,6 +211,21 @@ struct UsageMailbox *createUsageMailbox(int maxLen)
     return ret;
 }
 
+struct ActivenessMailbox *createActivenessMailbox(int maxLen)
+{
+    struct ActivenessMailbox *ret = malloc(sizeof(struct ActivenessMailbox));
+    ret->maxLen = maxLen;
+    ret->currentLen = 0;
+    ret->readOffset = 0;
+    ret->writeOffset = 0;
+    if (0 != pthread_mutex_init(&(ret->lock), NULL))
+    {
+        printf("Error during creation of mutex.\n");
+    }
+    ret->data = malloc(maxLen * sizeof(enum ThreadType));
+    return ret;
+}
+
 struct LogMailbox *createLogMailbox(int maxLen)
 {
     struct LogMailbox *ret = malloc(sizeof(struct LogMailbox));
@@ -177,6 +237,6 @@ struct LogMailbox *createLogMailbox(int maxLen)
     {
         printf("Error during creation of mutex.\n");
     }
-    ret->data = malloc(maxLen * sizeof(char *));
+    ret->data = malloc(maxLen * sizeof(struct Log));
     return ret;
 }
