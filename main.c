@@ -2,7 +2,6 @@
 
 int main();
 int multiThreaded();
-int multiThreadedWithWatchdog();
 int singleThreaded();
 struct WatchdogArgs *getWatchdogArgs(int, pthread_t, pthread_t, pthread_t);
 
