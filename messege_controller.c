@@ -1,10 +1,9 @@
-#include "messege_controller.h"
+//#include "messege_controller.h"
 
 static struct ReadDataMailbox *readDataMailbox;
 static struct UsageMailbox *usageMailbox;
 static struct ActivenessMailbox *activenessMailbox;
 static struct LogMailbox *logMailbox;
-int cpuCount = 0; // cpuCount is initialised to non-zero value by reader
 useconds_t lockWaitingTime = 10;
 
 enum SendingResult sendReadData(struct CpuReadData *readData)

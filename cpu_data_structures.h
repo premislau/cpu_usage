@@ -1,3 +1,6 @@
+#ifndef CPU_DATA_STRUCTURES_H
+#define CPU_DATA_STRUCTURES_H
+
 struct CpuReadData
 {
     unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guestnice;
@@ -17,3 +20,5 @@ struct CpuUsage
     double usage;
     int index;
 };
+
+#endif

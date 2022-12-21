@@ -1,8 +1,16 @@
 cc ?= gcc
+CFLAGS = -Wall -Wextra -pthread
+
+OBJS = main.c
+PROG = cpu_usage.out
 
 
-compile: main.c
-	$(cc) -Wall -Wextra -pthread -o main.out main.c
+$(PROG): $(OBJS)
+	$(cc) $(CFLAGS) $(OBJS) -o $(PROG)
+
 
 test: test.c
 	$(cc) -Wall -Wextra -pthread -o test.out test.c
+
+clean:
+	rm -f *~ *.out $(PROG) core

@@ -1,4 +1,4 @@
-#include "program_logic.c"
+#include "program_logic.h"
 #include <assert.h>
 
 int main();

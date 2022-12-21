@@ -1,10 +1,14 @@
+#ifndef MESSEGE_CONTROLLER_H
+#define MESSEGE_CONTROLLER_H
+
 #include "cpu_data_structures.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <time.h>
+
+int cpuCount = 0; // cpuCount is initialised to non-zero value by reader
 
 enum SendingResult
 {
@@ -76,9 +80,11 @@ struct ActivenessMailbox
 enum SendingResult sendReadData(struct CpuReadData *);
 enum SendingResult sendUsage(struct CpuUsage *);
 enum SendingResult sendActiveness(enum ThreadType);
+enum SendingResult sendLog(struct Log);
 struct CpuReadData *receiveReadData();
 struct CpuUsage *receiveUsage();
 enum ThreadType receiveActiveness();
+struct Log receiveLog();
 void initReadDataMailbox(int);
 void initUsageMailbox(int);
 void initActivenessMailbox(int);
@@ -87,3 +93,7 @@ struct ReadDataMailbox *createReadDataMailbox(int);
 struct UsageMailbox *createUsageMailbox(int);
 struct ActivenessMailbox *createActivenessMailbox(int);
 struct LogMailbox *createLogMailbox(int);
+
+
+#include "messege_controller.c"
+#endif

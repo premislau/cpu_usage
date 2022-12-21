@@ -1,4 +1,4 @@
-#include "program_logic.c"
+#include "program_logic.h"
 
 int main();
 int multiThreaded();
@@ -14,7 +14,6 @@ int main()
 
 int multiThreaded()
 {
-    watchdogActive = 1;
     char* logFile = "logs.txt";
     initReadDataMailbox(2);
     initUsageMailbox(2);

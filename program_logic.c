@@ -1,58 +1,5 @@
-#include "program_logic.h"
+//#include "program_logic.h"
 
-const useconds_t dataWaitingTime = 50000;
-const useconds_t nextIterationWaitingTime = 950000;
-const useconds_t watchdogNextIterationWaitingTime = 2000000;
-const useconds_t loggerNextIterationWaitingTime = 500000;
-char **cpuNameStore = NULL;
-
-void *loggerLoop(void *args)
-{
-    char *loggerFile = (char *)args;
-    struct Log received;
-    while (1)
-    {
-        received = receiveLog();
-        while (NONE_LOG != received.logType)
-        {
-            saveLog(loggerFile, received);
-            received = receiveLog();
-        }
-        usleep(loggerNextIterationWaitingTime);
-    }
-}
-
-void saveLog(char *loggerFile, struct Log log)
-{
-    FILE *file = fopen(loggerFile, "a");
-    if (NULL == file)
-    {
-        printf("file cannot be opened\n");
-    }
-    char* strLog = logToString(log);
-    time_t now = time(0);
-    fprintf(file, "%s; %s", strLog, asctime(gmtime(&now)));
-    fclose(file);
-}
-
-char *logToString(struct Log log)
-{
-    char* ret = malloc(40*sizeof(char));
-    switch (log.logType)
-    {
-    case PROGRAM_STARTED:
-        sprintf(ret, "Program has been started");
-        
-        break;
-    case TERMINATION_BY_WATCHDOG:
-        sprintf(ret, "Program is terminated by watchdog");
-        break;
-    default:
-        sprintf(ret, "Unknown log");
-        break;
-    }
-    return ret;
-}
 
 void *readerLoop()
 {
@@ -67,14 +14,12 @@ void *readerLoop()
             sr = sendReadData(readData);
         }
         sr = sendActiveness(READER);
-        if (1 == watchdogActive)
-        {
             while (SUCCESS != sr)
             {
                 usleep(dataWaitingTime);
                 sr = sendActiveness(READER);
             }
-        }
+        
         usleep(nextIterationWaitingTime);
     }
 }
@@ -119,14 +64,11 @@ void *analyzerLoop()
         }
 
         sr = sendActiveness(ANALYZER);
-        if (1 == watchdogActive)
-        {
             while (SUCCESS != sr)
             {
                 usleep(dataWaitingTime);
                 sr = sendActiveness(ANALYZER);
             }
-        }
         usleep(nextIterationWaitingTime);
     }
 }
@@ -145,15 +87,14 @@ void *printerLoop()
         }
         print(usage, cpuCount);
         free(usage);
-        if (1 == watchdogActive)
-        {
+        
             sr = sendActiveness(PRINTER);
             while (SUCCESS != sr)
             {
                 usleep(dataWaitingTime);
                 sr = sendActiveness(PRINTER);
             }
-        }
+        
         usleep(nextIterationWaitingTime);
     }
 }
@@ -194,6 +135,8 @@ void *watchdogLoop(void *args)
                 {
                     pthread_cancel((data->threads + i)->threadId);
                 }
+                log.logType = TERMINATION_BY_WATCHDOG;
+                sendLog(log);
                 void *retval = NULL;
                 pthread_exit(retval);
             }
@@ -203,6 +146,26 @@ void *watchdogLoop(void *args)
             *(activeness + i) = 0;
         }
         usleep(watchdogNextIterationWaitingTime);
+    }
+}
+
+void *loggerLoop(void *args)
+{
+    char *loggerFile = (char *)args;
+    struct Log received;
+    while (1)
+    {
+        received = receiveLog();
+        while (NONE_LOG != received.logType)
+        {
+            saveLog(loggerFile, received);
+            if(TERMINATION_BY_WATCHDOG == received.logType){
+                void *retval = NULL;
+                pthread_exit(retval);
+            }
+            received = receiveLog();
+        }
+        usleep(loggerNextIterationWaitingTime);
     }
 }
 
@@ -278,6 +241,51 @@ void print(struct CpuUsage *data, int cpuCount)
     printf("\n");
 }
 
+struct CpuTimeData *startingTimeData(int cpuCount)
+{
+    struct CpuTimeData *ret = (struct CpuTimeData *)malloc(cpuCount * sizeof(struct CpuTimeData));
+    for (int i = 0; i < cpuCount; ++i)
+    {
+        (ret + i)->index = 0;
+        (ret + i)->Idle = 0;
+        (ret + i)->NonIdle = 0;
+        (ret + i)->Total = 0;
+    }
+    return ret;
+}
+
+void saveLog(char *loggerFile, struct Log log)
+{
+    FILE *file = fopen(loggerFile, "a");
+    if (NULL == file)
+    {
+        printf("file cannot be opened\n");
+    }
+    char* strLog = logToString(log);
+    time_t now = time(0);
+    fprintf(file, "%s; %s", strLog, asctime(gmtime(&now)));
+    fclose(file);
+}
+
+char *logToString(struct Log log)
+{
+    char* ret = malloc(40*sizeof(char));
+    switch (log.logType)
+    {
+    case PROGRAM_STARTED:
+        sprintf(ret, "Program has been started");
+        
+        break;
+    case TERMINATION_BY_WATCHDOG:
+        sprintf(ret, "Program is terminated by watchdog");
+        break;
+    default:
+        sprintf(ret, "Unknown log");
+        break;
+    }
+    return ret;
+}
+
 char *readRawData()
 {
     FILE *file = fopen("/proc/stat", "r");
@@ -309,18 +317,6 @@ int extractCpuCount(char *rawData)
     return ret + 1;
 }
 
-struct CpuTimeData *startingTimeData(int cpuCount)
-{
-    struct CpuTimeData *ret = (struct CpuTimeData *)malloc(cpuCount * sizeof(struct CpuTimeData));
-    for (int i = 0; i < cpuCount; ++i)
-    {
-        (ret + i)->index = 0;
-        (ret + i)->Idle = 0;
-        (ret + i)->NonIdle = 0;
-        (ret + i)->Total = 0;
-    }
-    return ret;
-}
 
 void initCpuNameStore(int cpuCount)
 {
