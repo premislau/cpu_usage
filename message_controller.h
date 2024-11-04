@@ -1,5 +1,5 @@
-#ifndef MESSEGE_CONTROLLER_H
-#define MESSEGE_CONTROLLER_H
+#ifndef message_CONTROLLER_H
+#define message_CONTROLLER_H
 
 #include "cpu_data_structures.h"
 #include <stdlib.h>
@@ -95,5 +95,5 @@ struct ActivenessMailbox *createActivenessMailbox(int);
 struct LogMailbox *createLogMailbox(int);
 
 
-#include "messege_controller.c"
+#include "message_controller.c"
 #endif

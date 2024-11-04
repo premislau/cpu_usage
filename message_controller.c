@@ -1,17 +1,13 @@
-//#include "messege_controller.h"
+//#include "message_controller.h"
 
 static struct ReadDataMailbox *readDataMailbox;
 static struct UsageMailbox *usageMailbox;
 static struct ActivenessMailbox *activenessMailbox;
 static struct LogMailbox *logMailbox;
-useconds_t lockWaitingTime = 10;
 
 enum SendingResult sendReadData(struct CpuReadData *readData)
 {
-    while (0 != pthread_mutex_lock(&(readDataMailbox->lock))) // 0 means success
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(readDataMailbox->lock));
     if (readDataMailbox->currentLen >= readDataMailbox->maxLen)
     {
         pthread_mutex_unlock(&(readDataMailbox->lock));
@@ -27,10 +23,7 @@ enum SendingResult sendReadData(struct CpuReadData *readData)
 
 enum SendingResult sendUsage(struct CpuUsage *usage)
 {
-    while (0 != pthread_mutex_lock(&(usageMailbox->lock))) // 0 means success
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(usageMailbox->lock));
     if (usageMailbox->currentLen >= usageMailbox->maxLen)
     {
         pthread_mutex_unlock(&(usageMailbox->lock));
@@ -45,10 +38,7 @@ enum SendingResult sendUsage(struct CpuUsage *usage)
 }
 
 enum SendingResult sendActiveness(enum ThreadType activeness){
-    while (0 != pthread_mutex_lock(&(activenessMailbox->lock))) // 0 means success
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(activenessMailbox->lock));
     if (activenessMailbox->currentLen >= activenessMailbox->maxLen)
     {
         pthread_mutex_unlock(&(activenessMailbox->lock));
@@ -64,10 +54,7 @@ enum SendingResult sendActiveness(enum ThreadType activeness){
 
 enum SendingResult sendLog(struct Log log)
 {
-    while (0 != pthread_mutex_lock(&(logMailbox->lock))) // 0 means success
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(logMailbox->lock));
     if (logMailbox->currentLen >= logMailbox->maxLen)
     {
         pthread_mutex_unlock(&(logMailbox->lock));
@@ -83,10 +70,7 @@ enum SendingResult sendLog(struct Log log)
 
 struct CpuReadData *receiveReadData()
 {
-    while (0 != pthread_mutex_lock(&(readDataMailbox->lock))) // 0 means success
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(readDataMailbox->lock));
     if (readDataMailbox->currentLen <= 0)
     {
         pthread_mutex_unlock(&(readDataMailbox->lock));
@@ -102,10 +86,7 @@ struct CpuReadData *receiveReadData()
 
 struct CpuUsage *receiveUsage()
 {
-    while (0 != pthread_mutex_lock(&(usageMailbox->lock))) // 0 means success
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(usageMailbox->lock));
     if (usageMailbox->currentLen <= 0)
     {
         pthread_mutex_unlock(&(usageMailbox->lock));
@@ -121,10 +102,7 @@ struct CpuUsage *receiveUsage()
 
 enum ThreadType receiveActiveness()
 {
-    while (0 != pthread_mutex_lock(&(activenessMailbox->lock))) // 0 means success
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(activenessMailbox->lock));
     if (activenessMailbox->currentLen <= 0)
     {
         pthread_mutex_unlock(&(activenessMailbox->lock));
@@ -141,10 +119,7 @@ enum ThreadType receiveActiveness()
 struct Log receiveLog()
 {
     struct Log ret;
-    while (0 != pthread_mutex_lock(&(logMailbox->lock))) // 0 means usccess
-    {
-        usleep(lockWaitingTime);
-    }
+    pthread_mutex_lock(&(logMailbox->lock));
     if (logMailbox->currentLen <= 0)
     {
         pthread_mutex_unlock(&(logMailbox->lock));

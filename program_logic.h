@@ -1,7 +1,7 @@
 #ifndef PROGRAM_LOGIC_H
 #define PROGRAM_LOGIC_H
 
-#include "messege_controller.h"
+#include "message_controller.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
